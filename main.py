@@ -1,10 +1,15 @@
 __author__ = 'Tofu Gang'
 
-from sys import exit
+from sys import argv, exit
+from PyQt5.QtWidgets import QApplication
+from src.main_window import MainWindow
 
 ################################################################################
 
 if __name__ == "__main__":
-    exit(0)
+    app = QApplication(argv)
+    window = MainWindow()
+    window.show()
+    exit(app.exec_())
 
 ################################################################################

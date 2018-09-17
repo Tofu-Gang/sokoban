@@ -1,3 +1,5 @@
 *.pyc
-__pycache__
-res
+__pycache__/
+res/
+doc/
+sokoban_rc.py
