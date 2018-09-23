@@ -17,5 +17,27 @@ class MainWindow(QMainWindow):
         model = DataModel()
         view = QGraphicsView(model)
         self.setCentralWidget(view)
+        model.level.algorithmStarted.connect(self._algorithmStarted)
+        model.level.algorithmFinished.connect(self._algorithmFinished)
+
+################################################################################
+
+    def _algorithmStarted(self):
+        """
+
+        :return:
+        """
+
+        self.statusBar().show()
+
+################################################################################
+
+    def _algorithmFinished(self):
+        """
+
+        :return:
+        """
+
+        self.statusBar().hide()
 
 ################################################################################

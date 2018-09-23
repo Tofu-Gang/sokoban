@@ -2,7 +2,7 @@ __author__ = 'Tofu Gang'
 
 from PyQt5.QtWidgets import QGraphicsObject
 from PyQt5.QtGui import QPixmap, QPainterPath
-from PyQt5.QtCore import QPointF, QPropertyAnimation, QRectF
+from PyQt5.QtCore import QPointF, QPropertyAnimation, QRectF, pyqtSignal as Signal
 from enum import Enum
 import sokoban_rc
 
@@ -13,6 +13,7 @@ class Tile(QGraphicsObject):
     BOUNDING_RECT = QRectF(QPointF(0, 0), QPointF(SIZE, SIZE))
     SHAPE = QPainterPath()
     SHAPE.addRect(BOUNDING_RECT)
+    Z_VALUE = 0
 
     class Type(Enum):
         WALL = '#'
@@ -50,6 +51,7 @@ class Tile(QGraphicsObject):
         self._pixmap = QPixmap(self.PIXMAPS[tileType])
         self._row = row
         self._column = column
+        self.setZValue(self.Z_VALUE)
 
 ################################################################################
 
@@ -114,7 +116,6 @@ class PassiveTile(Tile):
         """
 
         super().__init__(tileType, row, column)
-        self.setZValue(0)
         self._tileType = tileType
 
 ################################################################################
@@ -153,7 +154,6 @@ class Floor(Tile):
         """
 
         super().__init__(tileType, row, column)
-        self.setZValue(0)
         if tileType in (self.Type.FLOOR, self.Type.PLAYER, self.Type.BOX):
             self._pixmap = QPixmap(self.PIXMAPS[self.Type.FLOOR])
             self.update()
@@ -270,22 +270,86 @@ class Floor(Tile):
 
 ################################################################################
 
-class Player(Tile):
+class ActiveTile(Tile):
+    ANIMATION_DURATION = 200
+    Z_VALUE = 1
 
 ################################################################################
 
-    def __init__(self, tileType, row, column):
+    def __init__(self, level, tileType, row, column):
         """
-        Player implementation.
+
+        :param level: Level object to see what is around
         :param tileType: value from the enum Type
         :param row: number of the row in the grid
         :param column: number of the column in the grid
         """
 
         super().__init__(tileType, row, column)
-        self.setZValue(100)
         self._animation = QPropertyAnimation(self, b'pos')
-        self._animation.setDuration(50)
+        self._animation.setDuration(self.ANIMATION_DURATION)
+        self._level = level
+
+################################################################################
+
+    def setCoords(self, row, column, animated=False):
+        """
+
+        :param row:
+        :param column:
+        :return:
+        """
+
+        self._row = row
+        self._column = column
+        endPos = QPointF(column*self.SIZE, row*self.SIZE)
+        if animated:
+            self._animation.setStartValue(self.pos())
+            self._animation.setEndValue(endPos)
+            self._animation.start()
+        else:
+            self.setPos(endPos)
+
+################################################################################
+
+class Player(ActiveTile):
+    moveFinished = Signal()
+
+################################################################################
+
+    def __init__(self, level, tileType, row, column):
+        """
+
+        :param level: Level object to see what is around
+        :param tileType: value from the enum Type
+        :param row: number of the row in the grid
+        :param column: number of the column in the grid
+        """
+
+        super().__init__(level, tileType, row, column)
+        self._animation.finished.connect(self.moveFinished)
+
+################################################################################
+
+    def setCoords(self, row, column, animated=False):
+        """
+
+        :param row:
+        :param column:
+        :return:
+        """
+
+        tileFrom = self._level.tileOnCoords(self._row, self._column)
+        tileFrom.movePlayerOut()
+        tileTo = self._level.tileOnCoords(row, column)
+        tileTo.movePlayerIn()
+        if tileTo.isGoal:
+            self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER_ON_GOAL])
+        else:
+            self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER])
+        self.update()
+
+        super().setCoords(row, column, animated)
 
 ################################################################################
 
@@ -302,13 +366,10 @@ class Player(Tile):
 
         rowTo = self._row+dRow
         columnTo = self._column+dColumn
-        tileTo = self.scene().tileOnCoords(rowTo, columnTo)
+        tileTo = self._level.tileOnCoords(rowTo, columnTo)
         if tileTo.isFloor:
             if tileTo.hasBox:
-                rowTo2 = self._row + 2*dRow
-                columnTo2 = self._column + 2*dColumn
-                tileTo2 = self.scene().tileOnCoords(rowTo2, columnTo2)
-                return tileTo2.isFloor and not tileTo2.hasBox
+                return self._level.box(rowTo, columnTo).canBeMoved(dRow, dColumn)
             else:
                 return True
         else:
@@ -316,7 +377,7 @@ class Player(Tile):
 
 ################################################################################
 
-    def move(self, dRow, dColumn):
+    def move(self, dRow, dColumn, animated=False):
         """
         Moves the player in the specified direction. Makes no checks if it is
         actually possible.
@@ -327,43 +388,39 @@ class Player(Tile):
 
         rowTo = self._row+dRow
         columnTo = self._column+dColumn
-        tile = self.scene().tileOnCoords(self._row, self._column)
-        tileTo = self.scene().tileOnCoords(rowTo, columnTo)
+        tileTo = self._level.tileOnCoords(rowTo, columnTo)
         if tileTo.hasBox:
-            box = self.scene().box(rowTo, columnTo)
-            box.move(dRow, dColumn)
-        self._animation.setStartValue(self.pos())
-        self._animation.setEndValue(tileTo.pos())
-        self._animation.finished.connect(self.scene().unlockMoving)
-        self._animation.start()
-        self._row += dRow
-        self._column += dColumn
-        tile.movePlayerOut()
-        tileTo.movePlayerIn()
+            box = self._level.box(rowTo, columnTo)
+            box.move(dRow, dColumn, animated)
+        if animated:
+            self.scene().lockMoving()
+        self.setCoords(rowTo, columnTo, animated)
+
+################################################################################
+
+class Box(ActiveTile):
+
+################################################################################
+
+    def setCoords(self, row, column, animated=False):
+        """
+
+        :param row:
+        :param column:
+        :return:
+        """
+
+        tileFrom = self._level.tileOnCoords(self._row, self._column)
+        tileFrom.pushBoxOut()
+        tileTo = self._level.tileOnCoords(row, column)
+        tileTo.pushBoxIn()
         if tileTo.isGoal:
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER_ON_GOAL])
+            self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX_ON_GOAL])
         else:
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER])
+            self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX])
         self.update()
 
-################################################################################
-
-class Box(Tile):
-
-################################################################################
-
-    def __init__(self, tileType, row, column):
-        """
-        Box implementation.
-        :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
-        """
-
-        super().__init__(tileType, row, column)
-        self.setZValue(100)
-        self._animation = QPropertyAnimation(self, b'pos')
-        self._animation.setDuration(50)
+        super().setCoords(row, column, animated)
 
 ################################################################################
 
@@ -379,7 +436,7 @@ class Box(Tile):
 
         rowTo = self._row+dRow
         columnTo = self._column+dColumn
-        tileTo = self.scene().tileOnCoords(rowTo, columnTo)
+        tileTo = self._level.tileOnCoords(rowTo, columnTo)
         if tileTo.isFloor:
             return not tileTo.hasBox
         else:
@@ -387,7 +444,7 @@ class Box(Tile):
 
 ################################################################################
 
-    def move(self, dRow, dColumn):
+    def move(self, dRow, dColumn, animated=False):
         """
         Moves the box in the specified direction. Makes no checks if it is
         actually possible.
@@ -398,19 +455,6 @@ class Box(Tile):
 
         rowTo = self._row+dRow
         columnTo = self._column+dColumn
-        tile = self.scene().tileOnCoords(self._row, self._column)
-        tileTo = self.scene().tileOnCoords(rowTo, columnTo)
-        self._animation.setStartValue(self.pos())
-        self._animation.setEndValue(tileTo.pos())
-        self._animation.start()
-        self._row += dRow
-        self._column += dColumn
-        tile.pushBoxOut()
-        tileTo.pushBoxIn()
-        if tileTo.isGoal:
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX_ON_GOAL])
-        else:
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX])
-        self.update()
+        self.setCoords(rowTo, columnTo, animated)
 
 ################################################################################
