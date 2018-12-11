@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QGraphicsObject
 from PyQt5.QtGui import QPixmap, QPainterPath
 from PyQt5.QtCore import QPointF, QPropertyAnimation, QRectF, pyqtSignal as Signal
 from enum import Enum
-import sokoban_rc
+from res import sokoban_rc
 
 ################################################################################
 
