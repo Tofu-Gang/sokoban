@@ -2,6 +2,7 @@ __author__ = 'Tofu Gang'
 
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtCore import QPointF, QRectF, Qt
+from PyQt5.QtGui import QKeyEvent
 from src.level import Level
 
 ################################################################################
@@ -10,59 +11,70 @@ class DataModel(QGraphicsScene):
 
 ################################################################################
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
-
+        Creates a data model which is used for a graphic representation of
+        Sokoban level (QGraphics View framework). QGraphicsScene.keyPressEvent()
+        is implemented to process various player input.
         """
 
         super().__init__()
         self._level = Level()
-        width = self._level.width
-        height = self._level.height
-        self.setSceneRect(QRectF(QPointF(0, 0), QPointF(width, height)))
-        [self.addItem(item) for item in self._level.tiles+self._level.boxes+[self._level.player]]
-        self._level.player.moveFinished.connect(self.unlockMoving)
-        self._moveLock = False
+        self.setSceneRect(QRectF(QPointF(0, 0), QPointF(self._level.width, self._level.height)))
+        [self.addItem(item) for item in self._level.tiles+self._level.boxes+tuple([self._level.player])]
+        self._level.player.moveFinished.connect(self.unlockGame)
+        self._gameLock = False
 
 ################################################################################
 
     @property
-    def level(self):
+    def level(self) -> Level:
         """
-
-        :return:
+        :return: current level object
         """
 
         return self._level
 
 ################################################################################
 
-    def lockMoving(self):
+    def lockGame(self) -> None:
+        """
+        Locks the game to deny the player any input.
+
+        :return: None
         """
 
-        :return:
-        """
-
-        self._moveLock = True
+        self._gameLock = True
 
 ################################################################################
 
-    def unlockMoving(self):
+    def unlockGame(self) -> None:
+        """
+        Unlocks the game to allow the player any input.
+
+        :return: None
         """
 
-        :return:
-        """
-
-        self._moveLock = False
+        self._gameLock = False
 
 ################################################################################
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """
+        Handles the player's keyboard input.
+        Possible actions:
+        -move player up, down, left, right
+        -reset level to the initial state
+        -start bfs algorithm (deterministic)
+        -start bfs algorithm (non-deterministic)
+        -start dfs algorithm (deterministic)
+        -start dfs algorithm (non-deterministic)
+        
+        :param event: QKeyEvent to be handled
+        :return: None
         """
 
-        """
-
-        if not self._moveLock:
+        if not self._gameLock:
             key = event.key()
             if key in self._level.DIRECTIONS:
                 dRow = self._level.DIRECTIONS[key][0]

@@ -1,10 +1,11 @@
 __author__ = 'Tofu Gang'
 
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal as Signal
-from src.tile import Tile, PassiveTile, Floor, Player, Box
-from pickle import dump, load
+from src.tile import Tile, PassiveTile, Player, Box
 from random import shuffle
 from enum import Enum
+from typing import Union, Tuple, Dict
+
 
 ################################################################################
 
@@ -46,74 +47,80 @@ class Level(QObject):
              (BK, WL, WL, WL, WL, BK, BK, BK),
              (BK, BK, BK, BK, BK, BK, BK, BK))
 
-    with open('res/levels/world_01/01', 'wb') as f:
-        dump(LEVEL, f)
-
 ################################################################################
 
-    def __init__(self, path=None):
+    def __init__(self) -> None:
         """
+        Level board representation (NOT the graphic one from Graphics View
+        framework). Methods are provided to get the board size, player and boxes
+        objects, box or a tile in a specific position (row, column), walls and
+        goal floor tiles and if the level is solved (all boxes placed on goal
+        floor tiles). Additionally, the level can be reset to the original
+        state. Furthermore, means for moving the player or boxes are provided
+        (with checks if the move is possible).
+        Lastly, AI is provided for solving the level (bfs and dfs tree search).
+        This AI-created solution can be played as well.
 
+        :return: None
         """
 
         super().__init__()
-
-        if not path:
-            with open('res/levels/world_01/01', 'rb') as f:
-                self._level = load(f)
 
         self._player = None
         self._tiles = []
         self._boxes = []
 
-        for rowNumber in range(len(self._level)):
-            row = self._level[rowNumber]
+        for rowNumber in range(len(self.LEVEL)):
+            row = self.LEVEL[rowNumber]
             for columnNumber in range(len(row)):
                 tileType = row[columnNumber]
-                if tileType in (Tile.Type.WALL, Tile.Type.BACKGROUND):
-                    tile = PassiveTile(tileType, rowNumber, columnNumber)
+
+                if tileType == Tile.Type.PLAYER:
+                    self._player = Player(rowNumber, columnNumber, False)
+                    self._tiles.append(PassiveTile(Tile.Type.FLOOR, rowNumber, columnNumber))
+                elif tileType == Tile.Type.PLAYER_ON_GOAL:
+                    self._player = Player(rowNumber, columnNumber, True)
+                    self._tiles.append(PassiveTile(Tile.Type.GOAL, rowNumber, columnNumber))
+                elif tileType == Tile.Type.BOX:
+                    self._boxes.append(Box(rowNumber, columnNumber, False))
+                    self._tiles.append(PassiveTile(Tile.Type.FLOOR, rowNumber, columnNumber))
+                elif tileType == Tile.Type.BOX_ON_GOAL:
+                    self._boxes.append(Box(rowNumber, columnNumber, True))
+                    self._tiles.append(PassiveTile(Tile.Type.GOAL, rowNumber, columnNumber))
                 else:
-                    if tileType in (Tile.Type.PLAYER, Tile.Type.PLAYER_ON_GOAL):
-                        self._player = Player(self, tileType, rowNumber, columnNumber)
-                        self._player.setPos(columnNumber*Tile.SIZE, rowNumber*Tile.SIZE)
-                    elif tileType in (Tile.Type.BOX, Tile.Type.BOX_ON_GOAL):
-                        box = Box(self, tileType, rowNumber, columnNumber)
-                        box.setPos(columnNumber*Tile.SIZE, rowNumber*Tile.SIZE)
-                        self._boxes.append(box)
-                    tile = Floor(tileType, rowNumber, columnNumber)
-                tile.setPos(columnNumber*Tile.SIZE, rowNumber*Tile.SIZE)
-                self._tiles.append(tile)
-        self._origState = self.state()
+                    self._tiles.append(PassiveTile(tileType, rowNumber, columnNumber))
+
+        self._tiles = tuple(self._tiles)
+        self._boxes = tuple(self._boxes)
+        self._origState = self.state
 
 ################################################################################
 
     @property
-    def width(self):
+    def width(self) -> int:
+        """
+        :return: number of columns of the level board
         """
 
-        :return:
-        """
-
-        return len(self._level[0])*Tile.SIZE
+        return len(self.LEVEL[0])*Tile.SIZE
 
 ################################################################################
 
     @property
-    def height(self):
+    def height(self) -> int:
         """
 
-        :return:
+        :return: number of rows of the level board
         """
 
-        return len(self._level)*Tile.SIZE
+        return len(self.LEVEL)*Tile.SIZE
 
 ################################################################################
 
     @property
-    def player(self):
+    def player(self) -> Player:
         """
-
-        :return:
+        :return: player object
         """
 
         return self._player
@@ -121,10 +128,10 @@ class Level(QObject):
 ################################################################################
 
     @property
-    def tiles(self):
+    def tiles(self) -> Tuple[PassiveTile]:
         """
-
-        :return:
+        :return: tuple of all tiles in the level (floors, goal floor tiles,
+        walls, background)
         """
 
         return self._tiles
@@ -132,117 +139,224 @@ class Level(QObject):
 ################################################################################
 
     @property
-    def boxes(self):
+    def boxes(self) -> Tuple[Box]:
         """
-
-        :return:
+        :return: tuple of all boxes in the level
         """
 
         return self._boxes
 
 ################################################################################
 
-    def state(self):
+    @property
+    # TODO: return annotation Dict[str[Tuple[int, int]]]
+    def state(self) -> Dict:
         """
-
-        :return:
+        :return: Current position of the player and all boxes in the level
         """
 
         return {
-            self.KEY_PLAYER_POS: (self.player.row, self.player.column),
+            self.KEY_PLAYER_POS: (self._player.row, self._player.column),
             self.KEY_BOXES_POS: tuple((box.row, box.column) for box in self._boxes)
         }
 
 ################################################################################
 
-    def goalCoords(self):
+    @property
+    def goalCoords(self) -> Tuple[Tuple[int, int]]:
+        """
+        :return: positions of all goal floor tiles in the level
         """
 
-        :return:
-        """
-
-        return tuple([tuple((tile.row, tile.column)) for tile in self._tiles if tile.isFloor and tile.isGoal])
+        return tuple([tuple((tile.row, tile.column))
+                      for tile in self._tiles
+                      if tile.isFloor and tile.isGoal])
 
 ################################################################################
 
-    def wallsCoords(self):
+    @property
+    def wallsCoords(self) -> Tuple[Tuple[int, int]]:
+        """
+        :return: positions of all walls in the level
         """
 
-        :return:
-        """
+        walls = []
+        for tile in self._tiles:
+            if not tile.isFloor:
+                walls.append((tile.row, tile.column))
 
-        return tuple([tuple((tile.row, tile.column)) for tile in self._tiles if tile.tileType is Tile.Type.WALL])
+        return tuple(walls)
 
 ################################################################################
 
-    def isSolved(self):
+    @property
+    def isSolved(self) -> bool:
         """
-
-        :return:
+        :return: True if the level is solved (all boxes placed on goal floor
+        tiles), False otherwise
         """
 
         return all(self.tileOnCoords(box.row, box.column).isGoal for box in self._boxes)
 
 ################################################################################
 
-    def reset(self, state=None):
+    def tileOnCoords(self, row: int, column: int) -> Tile:
+        """
+        :param row: row number in the level board
+        :param column: column number in the level board
+        :return: tile in the specified position from the params
         """
 
-        :return:
+        return [tile for tile in self._tiles if
+                tile.row == row and tile.column == column][0]
+
+################################################################################
+
+    def box(self, row, column) -> Union[Box, None]:
+        """
+        :param row: row number in the level board
+        :param column: column number in the level board
+        :return: Box object if there is a box in the specified position (by
+        params), None otherwise
+        """
+
+        try:
+            return [box for box in self._boxes
+                    if box.row == row and box.column == column][0]
+        except IndexError:
+            return None
+
+################################################################################
+
+    def reset(self, state: dict=None) -> None:
+        """
+        Resets the level to the specified state. If the state is not provided
+        (param value is None), the original state is used.
+
+        :return: None
         """
 
         if not state:
             state = self._origState
+        playerRowTo = state[self.KEY_PLAYER_POS][0]
+        playerColumnTo = state[self.KEY_PLAYER_POS][1]
+        movePlayerToGoal = (playerRowTo, playerColumnTo) in self.goalCoords
+        self._player.setCoords(playerRowTo, playerColumnTo, movePlayerToGoal)
 
-        self._player.setCoords(state[self.KEY_PLAYER_POS][0],
-                               state[self.KEY_PLAYER_POS][1])
-        [self._boxes[i].setCoords(state[self.KEY_BOXES_POS][i][0],
-                                  state[self.KEY_BOXES_POS][i][1])
-         for i in range(len(self._boxes))]
-
-################################################################################
-
-    def tileOnCoords(self, row, column):
-        """
-
-        :param row:
-        :param column:
-        :return:
-        """
-
-        return [tile for tile in self._tiles if tile.row == row and tile.column == column][0]
+        for i in range(len(self._boxes)):
+            boxRowTo = state[self.KEY_BOXES_POS][i][0]
+            boxColumnTo = state[self.KEY_BOXES_POS][i][1]
+            moveBoxToGoal = (boxRowTo, boxColumnTo) in self.goalCoords
+            box = self._boxes[i]
+            box.setCoords(boxRowTo, boxColumnTo, moveBoxToGoal)
 
 ################################################################################
 
-    def box(self, row, column):
+    def _canPlayerBeMoved(self, dRow: int, dColumn: int) -> bool:
+        """
+        Indicates whether the player can be moved in the specified direction.
+
+        :param dRow: number of rows to move (negative is up, positive is down)
+        :param dColumn: number of columns to move (negative is left, positive is
+        right)
+        :return: True if the target tile is a floor/goal tile without a box or
+        if the box can be pushed aside on a free floor/goal tile, False
+        otherwise.
         """
 
-        :param row:
-        :param column:
-        :return:
-        """
+        rowTo = self._player.row+dRow
+        columnTo = self._player.column+dColumn
+        tileTo = self.tileOnCoords(rowTo, columnTo)
 
-        return [box for box in self._boxes if box.row == row and box.column == column][0]
+        if tileTo.isFloor:
+            box = self.box(rowTo, columnTo)
+            if box is not None:
+                return self._canBoxBeMoved(dRow, dColumn, box)
+            else:
+                return True
+        else:
+            return False
 
 ################################################################################
 
-    def movePlayer(self, dRow, dColumn, animated=False):
+    def _canBoxBeMoved(self, dRow: int, dColumn: int, box: Box) -> bool:
+        """
+        Indicates whether the box can be pushed in the specified direction.
+
+        :param dRow: number of rows to move (negative is up, positive is down)
+        :param dColumn: number of columns to move (negative is left, positive is
+        right)
+        :return: True if the target tile is a floor/goal tile without a box,
+        False otherwise.
         """
 
-        :param dRow:
-        :param dColumn:
-        """
-
-        if self._player.canBeMoved(dRow, dColumn):
-            self._player.move(dRow, dColumn, animated)
+        rowTo = box.row+dRow
+        columnTo = box.column+dColumn
+        tileTo = self.tileOnCoords(rowTo, columnTo)
+        if tileTo.isFloor:
+            return self.box(rowTo, columnTo) is None
+        else:
+            return False
 
 ################################################################################
 
-    def bfs(self, deterministic=True):
+    def _moveBox(self, dRow: int, dColumn: int, box: Box, animated: bool=False) -> None:
+        """
+        Moves the specified box in the specified direction. Makes no checks if
+        it is actually possible.
+
+        :param dRow: number of rows to move (negative is up, positive is down)
+        :param dColumn: number of columns to move (negative is left, positive is
+        right)
+        :param box: the box to be moved
+        :param: animated: True if the move should be animated, False otherwise
+        :return: None
         """
 
-        :param deterministic:
-        :return:
+        if self._canBoxBeMoved(dRow, dColumn, box):
+            rowTo = box.row + dRow
+            columnTo = box.column + dColumn
+            moveToGoal = (rowTo, columnTo) in self.goalCoords
+            box.move(dRow, dColumn, moveToGoal, animated)
+
+################################################################################
+
+    def movePlayer(self, dRow: int, dColumn: int, animated: bool=False) -> None:
+        """
+        Moves the player in the specified direction. Makes no checks if it is
+        actually possible.
+
+        :param dRow: number of rows to move (negative is up, positive is down)
+        :param dColumn: number of columns to move (negative is left, positive is
+        right)
+        :param: animated: True if the move should be animated, False otherwise
+        :return: None
+        """
+
+        playerRowTo = self._player.row+dRow
+        playerColumnTo = self._player.column+dColumn
+
+        if self._canPlayerBeMoved(dRow, dColumn):
+            box = self.box(playerRowTo, playerColumnTo)
+
+            if box is not None:
+                if self._canBoxBeMoved(dRow, dColumn, box):
+                    boxRowTo = box.row + dRow
+                    boxColumnTo = box.column + dColumn
+                    moveBoxToGoal = (boxRowTo, boxColumnTo) in self.goalCoords
+                    box.move(dRow, dColumn, moveBoxToGoal, animated)
+            movePlayerToGoal = (playerRowTo, playerColumnTo) in self.goalCoords
+            self._player.move(dRow, dColumn, movePlayerToGoal, animated)
+
+################################################################################
+
+    def bfs(self, deterministic: bool=True) -> None:
+        """
+        Launches bfs algorithm to search the level solution.
+
+        :param deterministic: True if directions in the tree are NOT shuffled,
+        False otherwise
+        :return: None
         """
 
         self._createGraph()
@@ -250,11 +364,13 @@ class Level(QObject):
 
 ################################################################################
 
-    def dfs(self, deterministic=True):
+    def dfs(self, deterministic: bool=True) -> None:
         """
+        Launches dfs algorithm to search the level solution.
 
-        :param deterministic:
-        :return:
+        :param deterministic: True if directions in the tree are NOT shuffled,
+        False otherwise
+        :return: None
         """
 
         self._createGraph()
@@ -262,23 +378,25 @@ class Level(QObject):
 
 ################################################################################
 
-    def _createGraph(self):
+    def _createGraph(self) -> None:
+        """
+        Creates the graph used for searching the level solution.
+
+        :return: None
         """
 
-        :return:
-        """
-
-        self._graph = Graph(self.state(), self.goalCoords(), self.wallsCoords())
+        self._graph = Graph(self.state, self.goalCoords, self.wallsCoords)
         self._graph.started.connect(self.algorithmStarted)
         self._graph.finished.connect(self._playSolution)
         self._graph.finished.connect(self.algorithmFinished)
 
 ################################################################################
 
-    def _playSolution(self):
+    def _playSolution(self) -> None:
         """
+        Plays the solution of the level found by an AI algorithm.
 
-        :return:
+        :return: None
         """
 
         self.reset()
@@ -287,10 +405,11 @@ class Level(QObject):
 
 ################################################################################
 
-    def _nextStep(self):
+    def _nextStep(self) -> None:
         """
+        Plays one step in the solution of the level found by an AI algorithm.
 
-        :return:
+        :return: None
         """
 
         step = self._graph.solutionStep()

@@ -1,19 +1,19 @@
 __author__ = 'Tofu Gang'
 
-from PyQt5.QtWidgets import QGraphicsObject
-from PyQt5.QtGui import QPixmap, QPainterPath
+from PyQt5.QtWidgets import QGraphicsObject, QStyleOptionGraphicsItem, QWidget
+from PyQt5.QtGui import QPixmap, QPainterPath, QPainter
 from PyQt5.QtCore import QPointF, QPropertyAnimation, QRectF, pyqtSignal as Signal
 from enum import Enum
+from abc import abstractmethod
 from res import sokoban_rc
 
 ################################################################################
 
 class Tile(QGraphicsObject):
-    SIZE = 30
+    SIZE = 30 # tile size in pixels
     BOUNDING_RECT = QRectF(QPointF(0, 0), QPointF(SIZE, SIZE))
     SHAPE = QPainterPath()
     SHAPE.addRect(BOUNDING_RECT)
-    Z_VALUE = 0
 
     class Type(Enum):
         WALL = '#'
@@ -38,45 +38,59 @@ class Tile(QGraphicsObject):
 
 ################################################################################
 
-    def __init__(self, tileType, row, column):
+    def __init__(self, tileType: Type, row: int, column: int) -> None:
         """
-        Basic Sokoban tile representation which knows how to paint itself in the
-        scene and its position in the grid.
+        Sokoban tile representation. Methods are provided for painting the tile
+        (from Graphics View framework) and to get the tile row and column number.
+        It is not meant to be instantiated directly; instead, it is used as a
+        parent class for more specific tile classes.
+
         :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
+        :param row: tile row number
+        :param column: tile column number
+        :return: None
         """
 
         super().__init__()
-        self._pixmap = QPixmap(self.PIXMAPS[tileType])
-        self._row = row
-        self._column = column
-        self.setZValue(self.Z_VALUE)
+        self._tileType = tileType
+        self._pixmap = QPixmap(self.PIXMAPS[self._tileType])
+        self.setPos(column * self.SIZE, row * self.SIZE)
 
 ################################################################################
 
-    def boundingRect(self):
+    def boundingRect(self) -> QRectF:
         """
         Reimplemented QGraphicsObject.boundingRect() method.
+
+        :return: tile bounding rectangle
         """
 
         return self.BOUNDING_RECT
 
 ################################################################################
 
-    def shape(self):
+    def shape(self) -> QPainterPath:
         """
         Reimplemented QGraphicsObject.shape() method.
+
+        :return: tile shape
         """
 
         return self.SHAPE
 
 ################################################################################
 
-    def paint(self, painter, option, widget=None):
+    def paint(self,
+              painter: QPainter,
+              option: QStyleOptionGraphicsItem,
+              widget: QWidget=None) -> None:
         """
         Reimplemented QGraphicsObject.paint() method.
 
+        :param painter: QPainter object used for drawing the tile
+        :param option: Qt black magic, unused
+        :param widget: Qt black magic, unused
+        :return: None
         """
 
         painter.drawPixmap(QPointF(0, 0), self._pixmap)
@@ -84,189 +98,67 @@ class Tile(QGraphicsObject):
 ################################################################################
 
     @property
-    def row(self):
+    def row(self) -> int:
         """
-        :return: number of the row in the grid
+        :return: tile row number
         """
 
-        return self._row
+        return self.pos().y() / self.SIZE
 
 ################################################################################
 
     @property
-    def column(self):
+    def column(self) -> int:
         """
-        :return: number of the column in the grid
+        :return: tile column number
         """
 
-        return self._column
+        return self.pos().x() / self.SIZE
 
 ################################################################################
 
 class PassiveTile(Tile):
+    Z_VALUE = 0
 
 ################################################################################
 
-    def __init__(self, tileType, row, column):
+    def __init__(self, tileType: Tile.Type, row: int, column: int) -> None:
         """
-        Background and wall tiles implementation.
+        Implementation of floor, wall and background tiles. Methods are provided
+        to tell if the tile is a floor or a goal floor tile.
+
         :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
+        :param row: tile row number
+        :param column: tile column number
+        :return: None
         """
 
         super().__init__(tileType, row, column)
-        self._tileType = tileType
+        self.setZValue(self.Z_VALUE)
 
 ################################################################################
 
     @property
-    def tileType(self):
+    def isFloor(self) -> bool:
         """
-        :return: value from the enum Type
+        Indicates if this is a floor tile.
+
+        :return: True if this is a floor tile or a goal one, False otherwise
         """
 
-        return self._tileType
+        return self._tileType in (Tile.Type.GOAL, Tile.Type.FLOOR)
 
 ################################################################################
 
     @property
-    def isFloor(self):
+    def isGoal(self) -> bool:
         """
-        Indicates if it is possible to move a player or push a box here.
-        :return: always False
-        """
+        Indicates if this is a goal floor tile.
 
-        return False
-
-################################################################################
-
-class Floor(Tile):
-
-################################################################################
-
-    def __init__(self, tileType, row, column):
-        """
-        Floor tile implementation.
-        :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
+        :return: True if this is a goal floor tile, False otherwise
         """
 
-        super().__init__(tileType, row, column)
-        if tileType in (self.Type.FLOOR, self.Type.PLAYER, self.Type.BOX):
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.FLOOR])
-            self.update()
-        elif tileType in (self.Type.GOAL, self.Type.PLAYER_ON_GOAL, self.Type.BOX_ON_GOAL):
-            self._pixmap = QPixmap(self.PIXMAPS[self.Type.GOAL])
-            self.update()
-        self._hasBox = tileType in (self.Type.BOX, self.Type.BOX_ON_GOAL)
-        self._hasPlayer = tileType in (self.Type.PLAYER, self.Type.PLAYER_ON_GOAL)
-        self._isGoal = tileType in (self.Type.GOAL, self.Type.BOX_ON_GOAL, self.Type.PLAYER_ON_GOAL)
-
-################################################################################
-
-    @property
-    def tileType(self):
-        """
-        :return: value from the enum Type
-        """
-
-        if self.hasBox:
-            if self.isGoal:
-                return self.Type.BOX_ON_GOAL
-            else:
-                return self.Type.BOX
-        elif self.hasPlayer:
-            if self.isGoal:
-                return self.Type.PLAYER_ON_GOAL
-            else:
-                return self.Type.PLAYER
-        else:
-            if self.isGoal:
-                return self.Type.GOAL
-            else:
-                return self.Type.FLOOR
-
-################################################################################
-
-    @property
-    def isFloor(self):
-        """
-        Indicates if it is possible to move a player or push a box here.
-        :return: always True
-        """
-
-        return True
-
-################################################################################
-
-    @property
-    def isGoal(self):
-        """
-        Indicates if this is a goal tile.
-        :return: True if this is a goal tile, False otherwise
-        """
-
-        return self._isGoal
-
-################################################################################
-
-    @property
-    def hasBox(self):
-        """
-        Indicates if there is a box on this tile.
-        :return: True if there is a box on this tile, False otherwise
-        """
-
-        return self._hasBox
-
-################################################################################
-
-    def pushBoxOut(self):
-        """
-        Updates information about box being on this tile.
-        """
-
-        self._hasBox = False
-
-################################################################################
-
-    def pushBoxIn(self):
-        """
-        Updates information about box being on this tile.
-        """
-
-        self._hasBox = True
-
-################################################################################
-
-    @property
-    def hasPlayer(self):
-        """
-        Indicates if there is the player on this tile.
-        :return: True if there is the player on this tile, False otherwise
-        """
-
-        return self._hasPlayer
-
-################################################################################
-
-    def movePlayerOut(self):
-        """
-        Updates information about the player being on this tile.
-        """
-
-        self._hasPlayer = False
-
-################################################################################
-
-    def movePlayerIn(self):
-        """
-        Updates information about the player being on this tile.
-        """
-
-        self._hasPlayer = True
+        return self._tileType == self.Type.GOAL
 
 ################################################################################
 
@@ -276,39 +168,81 @@ class ActiveTile(Tile):
 
 ################################################################################
 
-    def __init__(self, level, tileType, row, column):
+    def __init__(self, tileType: Tile.Type, row: int, column: int) -> None:
         """
+        Player/box representation. Methods are provided for moving by one tile
+        in a specified direction and for moving anywhere in the board. It is not
+        meant to be instantiated directly; instead, it is used as a parent class
+        for Player and Box classes.
 
-        :param level: Level object to see what is around
         :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
+        :param row: tile row number
+        :param column: tile column number
+        :return: None
         """
 
         super().__init__(tileType, row, column)
+        self.setZValue(self.Z_VALUE)
         self._animation = QPropertyAnimation(self, b'pos')
         self._animation.setDuration(self.ANIMATION_DURATION)
-        self._level = level
 
 ################################################################################
 
-    def setCoords(self, row, column, animated=False):
+    def move(self, dRow: int, dColumn: int, moveToGoal: bool, animated: bool=False) -> None:
+        """
+        Moves the tile in the specified direction by one tile. Makes no checks
+        if it is actually possible.
+
+        :param dRow: number of rows to move (negative is up, positive is down)
+        :param dColumn: number of columns to move (negative is left, positive is
+        right)
+        :param moveToGoal True if the target tile is a goal tile, False
+        otherwise (used for choosing the correct pixmap)
+        :param animated: True if the move should be animated, False if not
+        :return: None
         """
 
-        :param row:
-        :param column:
-        :return:
-        """
+        endPos = QPointF((self.column+dColumn)*self.SIZE,
+                         (self.row+dRow)*self.SIZE)
 
-        self._row = row
-        self._column = column
-        endPos = QPointF(column*self.SIZE, row*self.SIZE)
         if animated:
+            self.scene().lockGame()
             self._animation.setStartValue(self.pos())
             self._animation.setEndValue(endPos)
             self._animation.start()
         else:
             self.setPos(endPos)
+        self.updatePixmap(moveToGoal)
+
+################################################################################
+
+    def setCoords(self, row: int, column: int, moveToGoal: bool) -> None:
+        """
+        Moves the tile to the specified place in the board. Makes no checks if
+        it is actually possible.
+
+        :param row: target tile row number
+        :param column: target tile column number
+        :param moveToGoal: True if the target tile is a goal tile, False
+        otherwise (used for choosing the correct pixmap)
+        :return: None
+        """
+
+        self.setPos(QPointF(column*self.SIZE, row*self.SIZE))
+        self.updatePixmap(moveToGoal)
+
+################################################################################
+
+    @abstractmethod
+    def updatePixmap(self, moveToGoal: bool) -> None:
+        """
+        Reimplemented in child classes Player and Box.
+
+        :param moveToGoal: unused
+        :return: None
+        """
+
+        pass
 
 ################################################################################
 
@@ -317,84 +251,42 @@ class Player(ActiveTile):
 
 ################################################################################
 
-    def __init__(self, level, tileType, row, column):
+    def __init__(self, row: int, column: int, isOnGoal: bool) -> None:
+        """
+        Player tile implementation. Method is provided for updating its pixmap
+        according to the tile the player is on (goal or non-goal floor tile).
+
+        :param row: tile row number
+        :param column: tile column number
+        :param isOnGoal: True if the player is initially placed on a goal tile,
+        False otherwise (used for choosing the correct pixmap)
+        :return: None
         """
 
-        :param level: Level object to see what is around
-        :param tileType: value from the enum Type
-        :param row: number of the row in the grid
-        :param column: number of the column in the grid
-        """
-
-        super().__init__(level, tileType, row, column)
+        if isOnGoal:
+            super().__init__(Tile.Type.PLAYER_ON_GOAL, row, column)
+        else:
+            super().__init__(Tile.Type.PLAYER, row, column)
         self._animation.finished.connect(self.moveFinished)
 
 ################################################################################
 
-    def setCoords(self, row, column, animated=False):
+    def updatePixmap(self, isOnGoal: bool) -> None:
+        """
+        Reimplemented abstract method ActiveTile.updatePixmap().
+        Updates the pixmap accordingly to the tile the player is on (goal or
+        non-goal floor tile).
+
+        :param isOnGoal: True if the player is initially placed on a goal tile,
+        False otherwise (used for choosing the correct pixmap)
+        :return: None
         """
 
-        :param row:
-        :param column:
-        :return:
-        """
-
-        tileFrom = self._level.tileOnCoords(self._row, self._column)
-        tileFrom.movePlayerOut()
-        tileTo = self._level.tileOnCoords(row, column)
-        tileTo.movePlayerIn()
-        if tileTo.isGoal:
+        if isOnGoal:
             self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER_ON_GOAL])
         else:
             self._pixmap = QPixmap(self.PIXMAPS[self.Type.PLAYER])
         self.update()
-
-        super().setCoords(row, column, animated)
-
-################################################################################
-
-    def canBeMoved(self, dRow, dColumn):
-        """
-        Indicates whether the player can be moved in the specified direction.
-        :param dRow: number of rows to move (negative is up, positive is down)
-        :param dColumn: number of columns to move (negative is left, positive is
-        right)
-        :return: True if the target tile is a floor/goal tile without a box or
-        if the box can be pushed aside on a free floor/goal tile, False
-        otherwise.
-        """
-
-        rowTo = self._row+dRow
-        columnTo = self._column+dColumn
-        tileTo = self._level.tileOnCoords(rowTo, columnTo)
-        if tileTo.isFloor:
-            if tileTo.hasBox:
-                return self._level.box(rowTo, columnTo).canBeMoved(dRow, dColumn)
-            else:
-                return True
-        else:
-            return False
-
-################################################################################
-
-    def move(self, dRow, dColumn, animated=False):
-        """
-        Moves the player in the specified direction. Makes no checks if it is
-        actually possible.
-        :param dRow: number of rows to move (negative is up, positive is down)
-        :param dColumn: number of columns to move (negative is left, positive is
-        right)
-        """
-
-        rowTo = self._row+dRow
-        columnTo = self._column+dColumn
-        tileTo = self._level.tileOnCoords(rowTo, columnTo)
-        if tileTo.hasBox:
-            box = self._level.box(rowTo, columnTo)
-            box.move(dRow, dColumn, animated)
-        if animated:
-            self.scene().lockMoving()
-        self.setCoords(rowTo, columnTo, animated)
 
 ################################################################################
 
@@ -402,59 +294,40 @@ class Box(ActiveTile):
 
 ################################################################################
 
-    def setCoords(self, row, column, animated=False):
+    def __init__(self, row: int, column: int, isOnGoal: bool) -> None:
+        """
+        Box tile implementation. Method is provided for updating its pixmap
+        according to the tile the box is on (goal or non-goal floor tile).
+
+        :param row: tile row number
+        :param column: tile column number
+        :param isOnGoal: True if the box is initially placed on a goal tile,
+        False otherwise (used for choosing the correct pixmap)
+        :return: None
         """
 
-        :param row:
-        :param column:
-        :return:
+        if isOnGoal:
+            super().__init__(Tile.Type.BOX_ON_GOAL, row, column)
+        else:
+            super().__init__(Tile.Type.BOX, row, column)
+
+################################################################################
+
+    def updatePixmap(self, isOnGoal: bool) -> None:
+        """
+        Reimplemented abstract method ActiveTile.updatePixmap().
+        Updates the pixmap accordingly to the tile the box is on (goal or
+        non-goal floor tile).
+
+        :param isOnGoal: True if the box is initially placed on a goal tile,
+        False otherwise (used for choosing the correct pixmap)
+        :return: None
         """
 
-        tileFrom = self._level.tileOnCoords(self._row, self._column)
-        tileFrom.pushBoxOut()
-        tileTo = self._level.tileOnCoords(row, column)
-        tileTo.pushBoxIn()
-        if tileTo.isGoal:
+        if isOnGoal:
             self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX_ON_GOAL])
         else:
             self._pixmap = QPixmap(self.PIXMAPS[self.Type.BOX])
         self.update()
-
-        super().setCoords(row, column, animated)
-
-################################################################################
-
-    def canBeMoved(self, dRow, dColumn):
-        """
-        Indicates whether the box can be pushed in the specified direction.
-        :param dRow: number of rows to move (negative is up, positive is down)
-        :param dColumn: number of columns to move (negative is left, positive is
-        right)
-        :return: True if the target tile is a floor/goal tile without a box,
-        False otherwise.
-        """
-
-        rowTo = self._row+dRow
-        columnTo = self._column+dColumn
-        tileTo = self._level.tileOnCoords(rowTo, columnTo)
-        if tileTo.isFloor:
-            return not tileTo.hasBox
-        else:
-            return False
-
-################################################################################
-
-    def move(self, dRow, dColumn, animated=False):
-        """
-        Moves the box in the specified direction. Makes no checks if it is
-        actually possible.
-        :param dRow: number of rows to move (negative is up, positive is down)
-        :param dColumn: number of columns to move (negative is left, positive is
-        right)
-        """
-
-        rowTo = self._row+dRow
-        columnTo = self._column+dColumn
-        self.setCoords(rowTo, columnTo, animated)
 
 ################################################################################
