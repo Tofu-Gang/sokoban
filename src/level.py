@@ -28,28 +28,9 @@ class Level(QObject):
     KEY_PLAYER_POS = 'player_pos'
     KEY_BOXES_POS = 'boxes_pos'
 
-    WL = Tile.Type.WALL
-    PL = Tile.Type.PLAYER
-    PG = Tile.Type.PLAYER_ON_GOAL
-    BX = Tile.Type.BOX
-    BG = Tile.Type.BOX_ON_GOAL
-    GL = Tile.Type.GOAL
-    FL = Tile.Type.FLOOR
-    BK = Tile.Type.BACKGROUND
-
-    LEVEL = ((BK, BK, BK, BK, BK, BK, BK, BK),
-             (BK, WL, WL, WL, WL, BK, BK, BK),
-             (BK, WL, FL, GL, WL, BK, BK, BK),
-             (BK, WL, FL, FL, WL, WL, WL, BK),
-             (BK, WL, BG, PL, FL, FL, WL, BK),
-             (BK, WL, FL, FL, BX, FL, WL, BK),
-             (BK, WL, FL, FL, WL, WL, WL, BK),
-             (BK, WL, WL, WL, WL, BK, BK, BK),
-             (BK, BK, BK, BK, BK, BK, BK, BK))
-
 ################################################################################
 
-    def __init__(self) -> None:
+    def __init__(self, filePath: str) -> None:
         """
         Level board representation (NOT the graphic one from Graphics View
         framework). Methods are provided to get the board size, player and boxes
@@ -61,6 +42,7 @@ class Level(QObject):
         Lastly, AI is provided for solving the level (bfs and dfs tree search).
         This AI-created solution can be played as well.
 
+        :param filePath: path to the level file
         :return: None
         """
 
@@ -69,9 +51,10 @@ class Level(QObject):
         self._player = None
         self._tiles = []
         self._boxes = []
+        self._level = self._openLevelFile(filePath)
 
-        for rowNumber in range(len(self.LEVEL)):
-            row = self.LEVEL[rowNumber]
+        for rowNumber in range(len(self._level)):
+            row = self._level[rowNumber]
             for columnNumber in range(len(row)):
                 tileType = row[columnNumber]
 
@@ -102,7 +85,7 @@ class Level(QObject):
         :return: number of columns of the level board
         """
 
-        return len(self.LEVEL[0])*Tile.SIZE
+        return len(self._level[0])*Tile.SIZE
 
 ################################################################################
 
@@ -113,7 +96,7 @@ class Level(QObject):
         :return: number of rows of the level board
         """
 
-        return len(self.LEVEL)*Tile.SIZE
+        return len(self._level)*Tile.SIZE
 
 ################################################################################
 
@@ -197,6 +180,45 @@ class Level(QObject):
         """
 
         return all(self.tileOnCoords(box.row, box.column).isGoal for box in self._boxes)
+
+################################################################################
+
+    # TODO: return annotation Tuple[Tuple[Tile.Type]]
+    def _openLevelFile(self, filePath: str):
+        """
+        Loads level board from a specified file.
+
+        :param filePath: path to the level file
+        :return: level board structure created from Tile.Type enum values
+        """
+
+        level = []
+
+        with open(filePath, "r") as f:
+            for line in f.readlines():
+                stripped = line.strip()
+                row = []
+                for literal in stripped:
+                    if literal == Tile.Type.WALL.value:
+                        row.append(Tile.Type.WALL)
+                    elif literal == Tile.Type.PLAYER.value:
+                        row.append(Tile.Type.PLAYER)
+                    elif literal == Tile.Type.PLAYER_ON_GOAL.value:
+                        row.append(Tile.Type.PLAYER_ON_GOAL)
+                    elif literal == Tile.Type.BOX.value:
+                        row.append(Tile.Type.BOX)
+                    elif literal == Tile.Type.BOX_ON_GOAL.value:
+                        row.append(Tile.Type.BOX_ON_GOAL)
+                    elif literal == Tile.Type.GOAL.value:
+                        row.append(Tile.Type.GOAL)
+                    elif literal == Tile.Type.FLOOR.value:
+                        row.append(Tile.Type.FLOOR)
+                    elif literal == Tile.Type.BACKGROUND.value:
+                        row.append(Tile.Type.BACKGROUND)
+                    else:
+                        row.append(None)
+                level.append(tuple(row))
+            return tuple(level)
 
 ################################################################################
 

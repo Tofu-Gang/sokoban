@@ -19,7 +19,7 @@ class DataModel(QGraphicsScene):
         """
 
         super().__init__()
-        self._level = Level()
+        self._level = Level("levels/01/01")
         self.setSceneRect(QRectF(QPointF(0, 0), QPointF(self._level.width, self._level.height)))
         [self.addItem(item) for item in self._level.tiles+self._level.boxes+tuple([self._level.player])]
         self._level.player.moveFinished.connect(self.unlockGame)
