@@ -115,27 +115,11 @@ Implemented as BFS from `state.player`. Walls and box positions are treated as b
 
 ## Deadlock detection (`deadlock.js`)
 
-Precomputed once per level load. Not recalculated per move.
-
-### Dead squares
-
-A square is *dead* if a box placed on it can never be pushed to any goal, regardless of other box positions.
+Two complementary checks — one static, one per-node. See `docs/deadlock.md` for full algorithm details.
 
 ```js
-computeDeadSquares(state)   // → Set<number> of dead cell indices
-```
-
-Algorithm: reverse BFS ("pull" moves) from every goal. Any floor cell not reachable in reverse is a dead square.
-
-### Freeze deadlock
-
-A group of boxes is *frozen* if no box in the group can be pushed in any direction. A frozen group not covering all goals is a deadlock.
-
-Detected patterns (in addition to dead squares):
-- Any 2×2 block of boxes and/or walls with at least one box.
-
-```js
-isFrozenDeadlock(state)   // → boolean
+computeDeadSquares(grid, width, height)              // → Set<number>; computed once at level load
+isFrozenDeadlock(boxes, grid, width, height, pushedIndex)   // → boolean; checked after every push
 ```
 
 ### Usage

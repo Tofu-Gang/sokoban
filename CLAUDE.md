@@ -30,7 +30,7 @@ src/
     parser.js       # Parse .sok files → Level[]
     state.js        # GameState: Uint8Array grid + player pos + box Set<number>
     moves.js        # Move validation, push execution, reachability BFS
-    deadlock.js     # Static dead-square precomputation (once per level load)
+    deadlock.js     # Dead-square precomputation (once per level load) + per-node freeze deadlock check
   solver/
     worker.js       # Web Worker entry — receives state, posts results
     bfs.js          # BFS over push-state space with transposition table

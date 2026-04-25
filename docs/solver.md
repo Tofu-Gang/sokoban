@@ -82,7 +82,7 @@ The key is a string serialisation of the canonical state:
 ## Deadlock pruning
 
 At every node, before expanding successors, prune states where:
-- Any box lands on a dead square (precomputed — see `engine/deadlock.js`), or
+- Any box lands on a dead square (precomputed — see `docs/deadlock.md`), or
 - The state is a freeze deadlock.
 
 Dead squares are passed into the solver once at startup and reused across all nodes at zero per-node cost.
