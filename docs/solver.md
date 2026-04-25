@@ -35,7 +35,7 @@ Two states with the same canonical key are identical from the solver's perspecti
 
 ### BFS (`bfs.js`)
 
-Breadth-first search over the push-state space.
+Breadth-first search over the push-state space. Used for smaller/simpler levels (Microban). No heuristic — just deadlock pruning.
 
 - **Complete**: always finds the shortest solution (fewest pushes).
 - **Memory**: stores every visited state in a transposition table — becomes impractical for large levels.
@@ -47,7 +47,7 @@ bfs(state, deadSquares)   // → number[][] of flat box indices per push, or nul
 
 ### IDDFS (`iddfs.js`)
 
-Iterative-deepening depth-first search.
+Iterative-deepening depth-first search. Used for larger levels (XSokoban) where BFS runs out of memory. Same deadlock pruning as BFS, plus the heuristic to guide and prune the search.
 
 - **Complete**: yes, finds optimal solution when combined with a consistent heuristic (IDA*).
 - **Memory**: O(depth) — negligible compared to BFS.
