@@ -21,10 +21,10 @@ computeDeadSquares(grid, width, height)   // → Set<number> of dead cell indice
 BFS over reverse push moves from every goal:
 
 1. Start with all goal cells in the queue.
-2. For each dequeued cell, ask: from which neighbour cells could a box have been pushed into this cell? For each of the four directions:
-   - The box was at the neighbour cell, the player was one step further in the same direction, and pushed the box into the dequeued cell.
-   - That player cell (two steps from the dequeued cell, opposite the neighbour) must be floor — if it is a wall, this push was impossible.
-3. If the push was valid and the neighbour is a floor cell not yet visited, mark it reachable and enqueue it — it becomes the next dequeued cell, repeating from step 2.
+2. For each dequeued cell, ask: from which neighbor cells could a box have been pushed into this cell? For each of the four directions:
+   - The box was at the neighbor cell, the player was one step further in the same direction, and pushed the box into the dequeued cell.
+   - That player cell (two steps from the dequeued cell, opposite the neighbor) must be floor — if it is a wall, this push was impossible.
+3. If the push was valid and the neighbor is a floor cell not yet visited, mark it reachable and enqueue it — it becomes the next dequeued cell, repeating from step 2.
 4. Any floor cell not reached by this reverse BFS is a dead square.
 
 ### Usage

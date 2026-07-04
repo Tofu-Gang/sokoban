@@ -25,29 +25,30 @@ npm run preview   # preview production build
 ```
 src/
   assets/           # Tile images (see Tile assets section)
-  levels/           # .sok level files (XSB format), imported via ?raw
+  levels/           # Phase 1 — .sok level files (XSB format), imported via ?raw
   engine/           # Pure JS, zero React, fully testable
-    parser.js       # Parse .sok files → Level[]
-    state.js        # GameState: Uint8Array grid + player pos + box Set<number>
-    moves.js        # Move validation, push execution, reachability BFS
-    deadlock.js     # Dead-square precomputation (once per level load) + per-node freeze deadlock check
+    parser.js       # Phase 1 — Parse .sok files → Level[]
+    state.js        # Phase 2 — GameState: Uint8Array grid + player pos + box Set<number>
+    moves.js        # Phase 2 — Move validation, push execution, reachability BFS
+    deadlock.js     # Phase 4 — Dead-square precomputation (once per level load) + per-node freeze deadlock check
   solver/
-    worker.js       # Web Worker entry — receives state, posts results
-    bfs.js          # BFS over push-state space with transposition table
-    iddfs.js        # IDDFS (lower memory, better for deep levels)
-    heuristic.js    # Lower-bound: min matching of boxes to goals
-    dynamic.js      # PI-corral pruning (Phase 6, optional)
+    worker.js       # Phase 3 — Web Worker entry — receives state, posts results
+    bfs.js          # Phase 3 — BFS over push-state space with transposition table
+    iddfs.js        # Phase 5 — IDDFS (lower memory, better for deep levels)
+    heuristic.js    # Phase 5 — Lower-bound: min matching of boxes to goals
+    pi-corral.js    # Phase 5 — PI-corral pruning — see docs/pi-corral.md
   components/
-    LevelSelect.jsx
-    GameBoard.jsx   # CSS grid + tile <img> elements
-    GameControls.jsx
-    SolverPanel.jsx
+    LevelSelect.jsx   # Phase 1
+    GameBoard.jsx     # Phase 2 — CSS grid + tile <img> elements
+    GameControls.jsx  # Phase 2 — Undo, reset, move counter
+    SolverPanel.jsx   # Phase 3 — Algorithm selector, start/stop, progress, playback
   hooks/
-    useGame.js      # useReducer: MOVE, UNDO, RESET, LOAD_LEVEL
-    useSolver.js    # Worker lifecycle, solution receipt, playback
-  App.jsx
-  main.jsx
-  index.css
+    useGame.js      # Phase 2 — useReducer: MOVE, UNDO, RESET, LOAD_LEVEL
+    useSolver.js    # Phase 3 — Worker lifecycle, solution receipt, playback
+    useSwipe.js     # Phase 6 — Touch swipe detection for mobile controls
+  App.jsx           # Phase 1
+  main.jsx          # Phase 1
+  index.css         # Phase 1
 docs/               # Algorithm and format reference docs
 ```
 
@@ -59,8 +60,8 @@ docs/               # Algorithm and format reference docs
 | 2 | Playable game — state, moves, GameBoard, useGame | not started |
 | 3 | Solver baseline — BFS in Web Worker, useSolver | not started |
 | 4 | Static deadlock detection | not started |
-| 5 | IDA* with heuristic | not started |
-| 6 | Advanced pruning (PI-corrals) — optional | not started |
+| 5 | IDA* with heuristic + PI-corral pruning | not started |
+| 6 | Touch/swipe controls | not started |
 
 Update the Status column as phases complete.
 

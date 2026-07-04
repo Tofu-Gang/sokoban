@@ -24,7 +24,7 @@ Two game states are equivalent if they share the same box positions and the play
 **Canonical state = sorted box positions + player reachable region**
 
 In practice, a canonical key is constructed as:
-- The player position is replaced by the **top-left-most cell** of the player's reachable region (the normalised player position).
+- The player position is replaced by the **top-left-most cell** of the player's reachable region (the normalized player position).
 - Box positions are stored as a sorted array of flat indices.
 
 Two states with the same canonical key are identical from the solver's perspective and are deduplicated via a transposition table.
@@ -61,9 +61,9 @@ iddfs(state, deadSquares, heuristic)   // → number[][] of flat box indices per
 
 See `docs/heuristic.md`.
 
-### Dynamic pruning (`dynamic.js`)
+### Dynamic pruning (`pi-corral.js`)
 
-See Phase 6 (optional). PI-corral pruning — reduces the effective branching factor by identifying and ignoring irrelevant corrals.
+See `docs/pi-corral.md`. PI-corral pruning — reduces the effective branching factor at each node by restricting pushes to the boundary boxes of the most constrained PI-corral. Applied in IDDFS (Phase 5), not BFS.
 
 ---
 
@@ -71,10 +71,10 @@ See Phase 6 (optional). PI-corral pruning — reduces the effective branching fa
 
 Both BFS and IDDFS use a transposition table (a `Set<string>`) to avoid revisiting equivalent states.
 
-The key is a string serialisation of the canonical state:
+The key is a string serialization of the canonical state:
 
 ```js
-`${normalisedPlayerIndex}:${sortedBoxIndices.join(",")}`
+`${normalizedPlayerIndex}:${sortedBoxIndices.join(",")}`
 ```
 
 ---
@@ -121,7 +121,7 @@ Communication between the main thread (`useSolver.js`) and the worker (`worker.j
 
 ### SerializedState
 
-`GameState` cannot cross the Worker boundary directly (`Set` and `Uint8Array` require explicit handling). The serialised form is a plain object:
+`GameState` cannot cross the Worker boundary directly (`Set` and `Uint8Array` require explicit handling). The serialized form is a plain object:
 
 ```js
 {
